@@ -5,9 +5,6 @@
 #include <unordered_set>
 #include <sstream>
 #include <iomanip>
-#include <thread>
-#include <chrono>
-
 #include <openssl/sha.h>
 
 namespace fs = std::filesystem;
@@ -32,7 +29,6 @@ bool convertPdfToText(const std::string &pdfPath, const std::string &textPath) {
     return (std::system(command.c_str()) == 0);
 }
 
-
 // Função para carregar ficheiros processados a partir do log
 void loadProcessedFiles(const std::string &logFile, std::unordered_set<std::string> &processedFiles) {
     std::ifstream logFileStream(logFile);
@@ -48,10 +44,22 @@ void loadProcessedFiles(const std::string &logFile, std::unordered_set<std::stri
     }
 }
 
-int main(string wallet_id) {
+int main(int argc, char *argv[]) {
+    if (argc < 2) {
+        std::cerr << "Uso: " << argv[0] << " <wallet_id> [pdf_name]" << std::endl;
+        return 1;
+    }
+
+    const std::string wallet_id = argv[1];
     const std::string pdfFolder = "PDF/";
     const std::string contentFolder = "content/";
     const std::string logFile = "files.txt";
+
+    // Se um nome de PDF for fornecido como terceiro argumento
+    std::string targetPdf;
+    if (argc == 3) {
+        targetPdf = argv[2];
+    }
 
     // Conjunto para armazenar os PDFs já processados
     std::unordered_set<std::string> processedFiles;
@@ -63,43 +71,48 @@ int main(string wallet_id) {
     // Carregar ficheiros processados do log
     loadProcessedFiles(logFile, processedFiles);
 
-        for (const auto &entry : fs::directory_iterator(pdfFolder)) {
-            if (entry.is_regular_file() && entry.path().extension() == ".pdf") {
-                const std::string pdfPath = entry.path().filename().string();
+    for (const auto &entry : fs::directory_iterator(pdfFolder)) {
+        if (entry.is_regular_file() && entry.path().extension() == ".pdf") {
+            const std::string pdfPath = entry.path().filename().string();
 
-                // Verificar se já foi processado
-                if (processedFiles.find(pdfPath) == processedFiles.end()) {
-                    const std::string textPath = contentFolder + entry.path().stem().string() + ".txt";
+            // Se um PDF alvo foi especificado, ignore outros
+            if (!targetPdf.empty() && pdfPath != targetPdf) {
+                continue;
+            }
 
-                    // Converter PDF para texto
-                    if (convertPdfToText(entry.path().string(), textPath)) {
-                        std::cout << "Convertido: " << pdfPath << " -> " << textPath << std::endl;
+            // Verificar se já foi processado
+            if (processedFiles.find(pdfPath) == processedFiles.end()) {
+                const std::string textPath = contentFolder + entry.path().stem().string() + ".txt";
 
-                        // Ler o conteúdo do ficheiro de texto
-                        std::ifstream inFile(textPath);
-                        std::stringstream buffer;
-                        buffer << inFile.rdbuf();
+                // Converter PDF para texto
+                if (convertPdfToText(entry.path().string(), textPath)) {
+                    std::cout << "Convertido: " << pdfPath << " -> " << textPath << std::endl;
 
-                        // Calcular o hash do conteúdo
-                        std::string contentHash = calculateHash(buffer.str());
-                        std::cout << "Hash extraído: " << contentHash << std::endl;
+                    // Ler o conteúdo do ficheiro de texto
+                    std::ifstream inFile(textPath);
+                    std::stringstream buffer;
+                    buffer << inFile.rdbuf();
 
-                        // Registar o hash e o nome do ficheiro no log
-                        std::ofstream logFileStream(logFile, std::ios::app);
-                        if (logFileStream) {
-                            logFileStream << pdfPath << ": " << contentHash << wallet_id << "\n";
-                        } else {
-                            std::cerr << "Erro ao abrir o ficheiro de log: " << logFile << std::endl;
-                        }
+                    // Calcular o hash do conteúdo
+                    std::string contentHash = calculateHash(buffer.str());
+                    std::cout << "Hash extraído: " << contentHash << std::endl;
 
-                        // Adicionar à lista de processados
-                        processedFiles.insert(pdfPath);
+                    // Registar o hash e o nome do ficheiro no log
+                    std::ofstream logFileStream(logFile, std::ios::app);
+                    if (logFileStream) {
+                        logFileStream << pdfPath << ": " << contentHash << " [" << wallet_id << "]" << "\n";
                     } else {
-                        std::cerr << "Erro ao converter: " << pdfPath << std::endl;
+                        std::cerr << "Erro ao abrir o ficheiro de log: " << logFile << std::endl;
                     }
+
+                    // Adicionar à lista de processados
+                    processedFiles.insert(pdfPath);
+                } else {
+                    std::cerr << "Erro ao converter: " << pdfPath << std::endl;
                 }
             }
         }
+    }
 
     return 0;
 }

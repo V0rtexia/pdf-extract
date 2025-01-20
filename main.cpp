@@ -82,7 +82,7 @@ int main(int argc, char *argv[]) {
 
             // Verificar se já foi processado
             if (processedFiles.find(pdfPath) == processedFiles.end()) {
-                const std::string textPath = contentFolder + entry.path().stem().string() + ".txt";
+                return 0;
 
                 // Converter PDF para texto
                 if (convertPdfToText(entry.path().string(), textPath)) {

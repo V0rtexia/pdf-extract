@@ -48,7 +48,7 @@ void loadProcessedFiles(const std::string &logFile, std::unordered_set<std::stri
     }
 }
 
-int main() {
+int main(string wallet_id) {
     const std::string pdfFolder = "PDF/";
     const std::string contentFolder = "content/";
     const std::string logFile = "files.txt";
@@ -63,7 +63,6 @@ int main() {
     // Carregar ficheiros processados do log
     loadProcessedFiles(logFile, processedFiles);
 
-    while (true) {
         for (const auto &entry : fs::directory_iterator(pdfFolder)) {
             if (entry.is_regular_file() && entry.path().extension() == ".pdf") {
                 const std::string pdfPath = entry.path().filename().string();
@@ -88,7 +87,7 @@ int main() {
                         // Registar o hash e o nome do ficheiro no log
                         std::ofstream logFileStream(logFile, std::ios::app);
                         if (logFileStream) {
-                            logFileStream << pdfPath << ": " << contentHash << "\n";
+                            logFileStream << pdfPath << ": " << contentHash << wallet_id << "\n";
                         } else {
                             std::cerr << "Erro ao abrir o ficheiro de log: " << logFile << std::endl;
                         }
@@ -101,10 +100,6 @@ int main() {
                 }
             }
         }
-
-        // Intervalo para evitar sobrecarga do sistema
-        std::this_thread::sleep_for(std::chrono::seconds(5));
-    }
 
     return 0;
 }
